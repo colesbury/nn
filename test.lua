@@ -5089,6 +5089,7 @@ local function testBatchNormalization(moduleName, dim, k)
       table.insert(size, torch.random(1,k))
    end
    local input = torch.zeros(table.unpack(size)):uniform()
+   local gradOutput = input:clone():uniform()
    local module = nn[moduleName](planes)
 
    local err = jac.testJacobian(module,input)
@@ -5132,6 +5133,23 @@ local function testBatchNormalization(moduleName, dim, k)
    local ferr,berr = jac.testIO(module,input)
    mytester:asserteq(ferr, 0, torch.typename(module) .. ' - i/o forward err ')
    mytester:asserteq(berr, 0, torch.typename(module) .. ' - i/o backward err ')
+
+   -- In-place
+   module = nn[moduleName](planes)
+   module.weight:uniform(-1, 1)
+   module.bias:uniform(-1, 1)
+   local ip = module:clone()
+   ip.inplace = true
+   local input2, gradOutput2 = input:clone(), gradOutput:clone()
+
+   local ferr = (module:forward(input) - ip:forward(input2)):abs():max()
+   local berr = (module:backward(input, gradOutput) - ip:backward(input2, gradOutput2)):abs():max()
+   mytester:assertlt(ferr, precision,  torch.typename(module) .. ' - in-place forward err')
+   mytester:assertlt(berr, precision,  torch.typename(module) .. ' - in-place backward err')
+   for _, key in ipairs{'running_mean', 'running_var', 'gradWeight', 'gradBias'} do
+      local err = (module[key] - ip[key]):abs():max()
+      mytester:assertlt(err, precision,  torch.typename(module) .. ' - in-place ' .. key .. ' err')
+   end
 end
 
 function nntest.BatchNormalization()

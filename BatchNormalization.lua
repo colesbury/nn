@@ -16,16 +16,19 @@
    The learning of gamma and beta is optional.
 
    Usage:
-   with    learnable parameters: nn.BatchNormalization(N [,eps] [,momentum])
-                                 where N = dimensionality of input
-   without learnable parameters: nn.BatchNormalization(N [,eps] [,momentum], false)
+   bn = nn.BatchNormalization(N [,eps] [,momentum] [,affine=true], [,inplace=false])
 
-   eps is a small value added to the standard-deviation to avoid divide-by-zero.
+   where
+    N = dimensionality of input
+    eps is a small value added to the standard-deviation to avoid divide-by-zero.
        Defaults to 1e-5
+    momentum is the coefficient controlling the moving average of mean and variance
+    affine = enables learnable parameters `weight` and `bias`
+    inplace computes output and gradInput in-place
 
-   In training time, this layer keeps a running estimate of it's computed mean and std.
-   The running sum is kept with a default momentum of 0.1 (unless over-ridden)
-   In test time, this running mean/std is used to normalize.
+   In training time, this layer keeps a running estimate of it's computed mean and variance.
+   The running sum is kept with a default momentum of 0.1 (unless overridden)
+   In test time, this running mean/variance is used to normalize.
 ]]--
 local BN,parent = torch.class('nn.BatchNormalization', 'nn.Module')
 local THNN = require 'nn.THNN'
@@ -35,7 +38,7 @@ BN.__version = 2
 -- expected dimension of input
 BN.nDim = 2
 
-function BN:__init(nOutput, eps, momentum, affine)
+function BN:__init(nOutput, eps, momentum, affine, inplace)
    parent.__init(self)
    assert(nOutput and type(nOutput) == 'number',
           'Missing argument #1: dimensionality of input. ')
@@ -52,6 +55,7 @@ function BN:__init(nOutput, eps, momentum, affine)
    self.momentum = momentum or 0.1
    self.running_mean = torch.zeros(nOutput)
    self.running_var = torch.ones(nOutput)
+   self.inplace = inplace or false
 
    if self.affine then
       self.weight = torch.Tensor(nOutput)
@@ -100,7 +104,12 @@ function BN:updateOutput(input)
 
    input = makeContiguous(self, input)
 
-   self.output:resizeAs(input)
+   if self.inplace then
+      self.output:set(input)
+   else
+      self.output:resizeAs(input)
+   end
+
    self.save_mean = self.save_mean or input.new()
    self.save_mean:resizeAs(self.running_mean)
    self.save_std = self.save_std or input.new()
@@ -117,7 +126,8 @@ function BN:updateOutput(input)
       self.save_std:cdata(),
       self.train,
       self.momentum,
-      self.eps)
+      self.eps,
+      self.inplace)
 
    return self.output
 end
@@ -144,7 +154,8 @@ local function backward(self, input, gradOutput, scale, gradInput, gradWeight, g
       THNN.optionalTensor(self.weight),
       self.save_mean:cdata(),
       self.save_std:cdata(),
-      scale)
+      scale,
+      self.inplace)
 
    return self.gradInput
 end
@@ -158,6 +169,7 @@ function BN:updateGradInput(input, gradOutput)
 end
 
 function BN:accGradParameters(input, gradOutput, scale)
+   assert(not self.inplace, 'use module:backward() for in-place')
    return backward(self, input, gradOutput, scale, nil, self.gradWeight, self.gradBias)
 end
 

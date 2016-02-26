@@ -1047,30 +1047,40 @@ C = model:forward({A, B})  -- C will be of size `b x m x p`
 <a name="nn.BatchNormalization"></a>
 ## BatchNormalization ##
 
-```lua
-module = nn.BatchNormalization(N [, eps] [, momentum] [,affine])
-```
-where `N` is the dimensionality of input
-`eps` is a small value added to the standard-deviation to avoid divide-by-zero. Defaults to `1e-5`.
-`affine` is a boolean. When set to false, the learnable affine transform is disabled. Defaults to true
-
-During training, this layer keeps a running estimate of its computed mean and std.
-The running sum is kept with a default momentum of 0.1 (unless over-ridden)
-During evaluation, this running mean/std is used for normalization.
-
 Implements Batch Normalization as described in [the paper](http://arxiv.org/pdf/1502.03167v3.pdf): "Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift" by Sergey Ioffe, Christian Szegedy.
+
+```lua
+module = nn.BatchNormalization(N [,eps] [,momentum] [,affine] [,inplace])
+module = nn.SpatialBatchNormalization(N  [,eps] [,momentum] [,affine] [,inplace])
+module = nn.VolumetricBatchNormalization(N  [,eps] [,momentum] [,affine] [,inplace])
+```
+
+- `N` is the dimensionality of input
+- `eps` is a small value added to the standard-deviation to avoid divide-by-zero. Defaults to `1e-5`.
+- `affine` is a boolean. When set to `false`, the learnable affine transform is disabled. Defaults to true
+- `inplace` is a boolean. When set to `true`, the `output` and `gradInput` are computed in-place.
+
+During training, this layer keeps a running estimate of its computed mean and variance.
+The running estimate is kept with a default `momentum` of 0.1 (unless overridden).
+During evaluation, this running mean/variance is used for normalization.
 
 The operation implemented is:
 
-```lua
+```
               x - mean(x)
 y =  ----------------------------- * gamma + beta
-      standard-deviation(x) + eps
+        sqrt(variance(x) + eps)
 ```
 
 where the mean and standard-deviation are calculated per-dimension over the mini-batches and where gamma and beta are learnable parameter vectors of size `N` (where `N` is the input size).
 The learning of gamma and beta is optional.
-The module only accepts 2D inputs.
+
+There are three variants of this module:
+- `nn.BatchNormalization`: 2D mini-batch inputs
+- `nn.SpatialBatchNormalization`: 4D mini-batch inputs
+- `nn.VolumetricBatchNormalziation`: 5D mini-batch inputs
+
+When using the in-place option, you must use [`Module:backward`](module.md#gradinput-backwardinput-gradoutput) instead of `Module:updateGradInput` and `Module:accGradParameters`.
 
 ```lua
 -- with learnable parameters

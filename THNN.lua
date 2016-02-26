@@ -488,7 +488,8 @@ TH_API void THNN_(BatchNormalization_updateOutput)(
           THTensor *save_std,
           bool train,
           double momentum,
-          double eps);
+          double eps,
+          bool inplace);
 TH_API void THNN_(BatchNormalization_backward)(
           THNNState *state,
           THTensor *input,
@@ -499,7 +500,8 @@ TH_API void THNN_(BatchNormalization_backward)(
           THTensor *weight,
           THTensor *save_mean,
           THTensor *save_std,
-          double scale);
+          double scale,
+          bool inplace);
 
 TH_API void THNN_(SpatialConvolutionMap_updateOutput)(
           THNNState *state,       // library state
